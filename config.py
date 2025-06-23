@@ -1,9 +1,11 @@
 # Tệp: config.py
 import os
+from dotenv import load_dotenv
 
-
-
-BOT_TOKEN = os.getenv('BOT_TOKEN', '7870846131:AAHqO06C8knRCb1JlvlDzBSXRQolgHUVrPk')
+load_dotenv()
+BOT_TOKEN = os.getenv('BOT_TOKEN')
+if not BOT_TOKEN:
+    raise ValueError("Không tìm thấy BOT_TOKEN trong biến môi trường!")
 
 # Các liên kết chính của bot
 APP_DOWNLOAD_LINK = 'https://99kl.app/DownloadApp/'
@@ -12,8 +14,9 @@ TELEGRAM_CHANNEL_LINK = 'https://t.me/bet_kl99'
 FACEBOOK_LINK = 'https://www.facebook.com/KL99GiaiTriDinhCaoChauA/'
 CSKH_LINK = 'https://umyq3uemgd.we2vub70.com/chatwindow.aspx?siteId=65002300&planId=88c557f5-5a2c-4ea3-b364-9cda2464fa7b&chatgroup=3&_=1748177033765'
 
-# Cấu hình Database
-DATABASE_FILE = "klbot.db"
+# --- DATABASE ---
+DB_NAME = 'klbot.db'
+DB_PATH = os.path.join(os.path.dirname(__file__), DB_NAME)
 
 # Tên người dùng của bot (sẽ được cập nhật tự động khi bot khởi tạo từ Telegram API)
 BOT_USERNAME = 'KL99OfficialBot'
