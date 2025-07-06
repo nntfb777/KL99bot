@@ -9,6 +9,7 @@ from telegram.ext import (
     MessageHandler,
     filters,
 )
+from .common import PROMO_FALLBACKS
 from telegram.helpers import escape_markdown
 from telegram.constants import ParseMode
 
@@ -52,7 +53,7 @@ async def ask_for_username(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
     await helpers.remove_buttons(update)
     await context.bot.send_message(
-        chat_id=query.effective_chat.id,
+        chat_id=query.message.chat_id,
         text=RESPONSE_MESSAGES["ask_username_app_promo"],
         reply_markup=keyboards.create_cancel_keyboard()
     )
@@ -109,11 +110,9 @@ async def send_request_to_admin(update: Update, context: ContextTypes.DEFAULT_TY
         details={"has_photo": with_photo}
     )
 
-    user_link = f"[{escape_markdown(user.first_name, version=2)}](tg://user?id={user.id})"
     admin_caption = (
-        f"Yêu cầu {promo_code} \\- {user_link} ({user.id})\n"
-        f"ID: `{claim_id}`\n"
-        f"Tên đăng nhập: `{escape_markdown(game_username, version=2)}`"
+        f"Yêu cầu trải nghiệm \\- [{escape_markdown(user.first_name, version=2)}](tg://user?id={user.id})\n"
+        f"ID: `{escape_markdown(game_username, version=2)}`"
     )
 
     admin_keyboard = keyboards.create_admin_promo_buttons(claim_id, user.id, promo_code)
@@ -135,19 +134,24 @@ async def send_request_to_admin(update: Update, context: ContextTypes.DEFAULT_TY
                 reply_markup=admin_keyboard,
                 parse_mode=ParseMode.MARKDOWN_V2
             )
-        
         # Notify user
-        user_message = RESPONSE_MESSAGES["app_promo_image_sent_to_admin"] if with_photo else RESPONSE_MESSAGES["app_promo_no_image_sent_to_admin"]
-        await context.bot.send_message(
-            chat_id=user.id,
-            text=user_message,
-            reply_markup=keyboards.create_back_to_main_menu_markup()
-        )
+
 
     except Exception as e:
         logger.error(f"Failed to send App Promo claim {claim_id} to admin group: {e}", exc_info=True)
         await context.bot.send_message(chat_id=user.id, text=RESPONSE_MESSAGES["error_sending_request"])
-    
+
+    if not with_photo:
+        # Lấy nội dung tin nhắn thông báo thất bại
+        failure_message = RESPONSE_MESSAGES["app_promo_no_image_sent_to_admin"]
+
+        # Gửi tin nhắn cho khách hàng
+        await context.bot.send_message(
+            chat_id=user.id,
+            text=failure_message,
+            reply_markup=keyboards.create_back_to_main_menu_markup()
+        )
+
     context.user_data.clear()
     return ConversationHandler.END
 
@@ -159,5 +163,8 @@ app_promo_conv_handler = ConversationHandler(
         AWAIT_IMAGE_CONFIRM: [CallbackQueryHandler(handle_image_confirm, pattern=r'^app_promo_has_image:(yes|no)$')],
         RECEIVE_IMAGE: [MessageHandler(filters.PHOTO, receive_image)],
     },
-    fallbacks=[CallbackQueryHandler(cancel, pattern='^cancel$')],
+    fallbacks=PROMO_FALLBACKS,  # <--- SỬ DỤNG FALLBACK CHUNG
+    block=False,                # <--- THÊM THAM SỐ NÀY
+    per_message=False,
+    name="app_conversation"
 )

@@ -6,7 +6,7 @@ from telegram.ext import ContextTypes, ConversationHandler
 from telegram.helpers import escape_markdown
 
 from core import database
-from utils import keyboards
+from utils import helpers, keyboards
 from texts import RESPONSE_MESSAGES
 import config
 
@@ -68,38 +68,43 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
 
 # Menu Navigation Handlers
-async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Sends or edits a message to show the main menu."""
-    caption = RESPONSE_MESSAGES["welcome_message"]
-    reply_markup = keyboards.create_main_menu_markup()
+async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """
+    Hiển thị menu chính.
+    - Nếu được gọi từ CallbackQuery (bấm nút), nó sẽ edit tin nhắn.
+    - Nếu được gọi từ Message (lệnh /start), nó sẽ gửi tin nhắn mới.
+    """
+    # Tạo nội dung và bàn phím trước
+    # Lấy user từ đúng nguồn (effective_user là an toàn nhất)
+    text = RESPONSE_MESSAGES["welcome_message"]
+    keyboard = keyboards.create_main_menu_markup()
 
+    # Kiểm tra xem update này đến từ việc bấm nút hay không
     if update.callback_query:
+        # Đây là trường hợp bấm nút "Quay lại"
         query = update.callback_query
         await query.answer()
-        # Edit the existing message to show the main menu
-        if query.message.caption:
-            await query.edit_message_caption(
-                caption=caption,
-                reply_markup=reply_markup
+        # Sử dụng hàm helper an toàn để edit
+        await helpers.edit_message_safely(query, text, keyboard)
+    else:
+        # Đây là trường hợp được gọi từ /start (hoặc một lệnh khác)
+        # Gửi một tin nhắn MỚI
+        if config.START_IMAGE_FILE_ID :
+            await context.bot.send_photo(
+                chat_id=update.effective_chat.id,
+                photo=config.START_IMAGE_FILE_ID ,
+                caption=text,
+                reply_markup=keyboard
             )
         else:
-            await query.edit_message_text(
-                text=caption,
-                reply_markup=reply_markup
+            await context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text=text,
+                reply_markup=keyboard
             )
-    elif update.message:
-        # Send a new message with the main menu
-        if config.START_IMAGE_FILE_ID:
-            await update.message.reply_photo(
-                photo=config.START_IMAGE_FILE_ID,
-                caption=caption,
-                reply_markup=reply_markup
-            )
-        else:
-            await update.message.reply_text(
-                text=caption,
-                reply_markup=reply_markup
-            )
+
+    # Nếu hàm này được dùng trong ConversationHandler, nó cần trả về trạng thái kết thúc
+    return ConversationHandler.END
 
 async def show_promo_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Displays the promotions menu."""
@@ -109,10 +114,13 @@ async def show_promo_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = RESPONSE_MESSAGES["choose_promo_message"]
     reply_markup = keyboards.create_promo_menu_markup()
 
-    # Edit the message to show the promo menu
-    # Assuming the main menu was sent with a photo, we edit the caption.
-    # If not, you might need to handle both edit_message_text and edit_message_caption.
-    try:
-        await query.edit_message_caption(caption=text, reply_markup=reply_markup)
-    except Exception:
-         await query.edit_message_text(text=text, reply_markup=reply_markup)
+    await helpers.edit_message_safely(query, text, reply_markup)
+    return ConversationHandler.END
+
+async def show_transaction_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Hiển thị menu Nạp/Rút."""
+    query = update.callback_query
+    await query.answer()
+    text = RESPONSE_MESSAGES["transaction_menu_intro"]
+    keyboard = keyboards.create_transaction_menu_markup()
+    await helpers.edit_message_safely(query, text, keyboard, parse_mode=None)

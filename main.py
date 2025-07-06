@@ -2,93 +2,135 @@
 
 import logging
 import sys
+import os
 
-# Add project root to path to allow absolute imports
-# sys.path.insert(0, '/path/to/your/klbot_project') # Adjust if needed
+# --- THIẾT LẬP ĐƯỜNG DẪN GỐC ---
+# Thêm thư mục gốc của dự án vào sys.path để có thể dùng absolute import
+project_root = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, project_root)
 
-# --- Core and Utils Imports ---
+# --- CÁC IMPORT CHÍNH ---
 import config
 from core.database import init_db
 from core.bot_setup import create_application
+from core.telegram_logger import TelegramLogHandler
 
-# --- Feature Handlers Imports ---
-from features.common_handlers import start, cancel, show_promo_menu, show_main_menu
-from features.get_id_handlers import get_chat_id_handler, get_file_id_handler
+# --- IMPORTS CHO HANDLERS ---
+# Common Handlers (Điều hướng chung)
+from features.common_handlers import start, cancel, show_promo_menu, show_main_menu, show_transaction_menu
+# Utility Handlers
+from features.get_id_handlers import get_id_handler
+# Admin Handlers
 from features.admin_handlers import (
     handle_admin_promo_response,
-    handle_admin_kl007_point_reply,
     handle_admin_share_response,
-    handle_admin_kl007_prompt,
-    handle_admin_kl006_response
-    # Add other admin handlers here, e.g.,
+    handle_admin_kl006_response,
+    handle_admin_kl007_point_reply,
+    handle_admin_deposit_response, # Handler cho các nút admin deposit đơn giản
+    admin_reply_conv_handler,
+    handle_admin_withdraw_response,
+    share_add_command
 )
+# Conversation Handlers
 from features.promo_handlers.kl001 import kl001_conv_handler
 from features.promo_handlers.kl006 import kl006_conv_handler
 from features.promo_handlers.kl007 import kl007_conv_handler
 from features.promo_handlers.app_promo import app_promo_conv_handler
 from features.promo_handlers.sharing import sharing_conv_handler
+from features.transaction_handlers.deposit import deposit_conv_handler
+from features.transaction_handlers.withdraw import withdraw_conv_handler
 
+# Import các lớp handler từ thư viện
 from telegram.ext import CommandHandler, CallbackQueryHandler, MessageHandler, filters
 
-# --- Basic Logging Configuration ---
-logging.basicConfig(
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    level=logging.INFO,
-    stream=sys.stdout,
-)
-logging.getLogger("httpx").setLevel(logging.WARNING)
-logger = logging.getLogger(__name__)
 
 def main() -> None:
-    """Start the bot."""
+    """Khởi tạo và chạy bot."""
+
+    # --- BƯỚC 1: KHỞI TẠO CÁC THÀNH PHẦN CƠ BẢN ---
+    init_db()
+    application = create_application()
+    logger = logging.getLogger(__name__) # Tạo logger sau khi Application được tạo
     logger.info("Starting bot initialization...")
 
-    # 1. Initialize the database
-    init_db()
+    # --- BƯỚC 2: CẤU HÌNH LOGGING NÂNG CAO ---
+    log_formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+    root_logger = logging.getLogger()
 
-    # 2. Create the Telegram Application object
-    application = create_application()
+    # Xóa các handler cũ để tránh log bị lặp nếu hàm main được gọi lại
+    if root_logger.hasHandlers():
+        root_logger.handlers.clear()
 
-    # 3. Register all handlers
+    root_logger.setLevel(logging.INFO) # Đặt cấp độ chung
+
+    # Handler để in ra console
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setFormatter(log_formatter)
+    root_logger.addHandler(console_handler)
+
+    # Handler để gửi log lỗi đến Telegram
+    if config.LOG_GROUP_CHAT_ID:
+        telegram_handler = TelegramLogHandler(application=application, chat_id=config.LOG_GROUP_CHAT_ID)
+        telegram_handler.setLevel(logging.ERROR) # Chỉ gửi lỗi ERROR và CRITICAL
+        telegram_handler.setFormatter(log_formatter)
+        root_logger.addHandler(telegram_handler)
+
+    # Giảm bớt log thừa từ các thư viện
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("apscheduler").setLevel(logging.WARNING)
+
+    logger.info("Logging configured.")
+
+    # --- BƯỚC 3: ĐĂNG KÝ HANDLER THEO NHÓM ƯU TIÊN ---
     logger.info("Registering handlers...")
 
-    # --- Conversation Handlers (for multi-step interactions) ---
-    application.add_handler(kl001_conv_handler)
-    application.add_handler(kl006_conv_handler)
-    application.add_handler(kl007_conv_handler)
-    application.add_handler(app_promo_conv_handler)
-    application.add_handler(sharing_conv_handler)
+    # GROUP 0: Các handler điều hướng toàn cục, ưu tiên cao nhất
+    navigation_handlers = [
+        CallbackQueryHandler(show_main_menu, pattern='^back_to_main_menu$'),
+        CallbackQueryHandler(show_promo_menu, pattern='^show_promo_menu$'),
+        CallbackQueryHandler(show_transaction_menu, pattern='^transaction_entry_point$'),
+        CallbackQueryHandler(cancel, pattern='^cancel$'),
+        CommandHandler("cancel", cancel)
+    ]
+    application.add_handlers(navigation_handlers, group=0)
 
-    # --- Admin Response Handlers ---
-    # These handlers process callbacks from buttons admins click
-    application.add_handler(CallbackQueryHandler(handle_admin_promo_response, pattern='^admin_response:'))
-    application.add_handler(CallbackQueryHandler(handle_admin_share_response, pattern='^admin_share_resp:'))
-    application.add_handler(CallbackQueryHandler(handle_admin_kl006_response, pattern=r'^admin_kl006:'))
-    application.add_handler(CallbackQueryHandler(handle_admin_kl007_prompt, pattern='^admin_kl007_prompt_reply:'))
-    # This handler processes text replies from admins (specifically for KL007 points)
-    application.add_handler(MessageHandler(
-        filters.Chat(chat_id=config.ID_GROUP_PROMO) & filters.REPLY & filters.TEXT & ~filters.COMMAND,
-        handle_admin_kl007_point_reply
-    ))
+    # GROUP 1: Các ConversationHandler cho các luồng chính
+    conv_handlers = [
+        kl001_conv_handler,
+        kl006_conv_handler,
+        kl007_conv_handler,
+        app_promo_conv_handler,
+        sharing_conv_handler,
+        deposit_conv_handler,
+        withdraw_conv_handler,
+        admin_reply_conv_handler
+    ]
+    application.add_handlers(conv_handlers, group=1)
 
-    # --- Command Handlers ---
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(CommandHandler("id", get_chat_id_handler))
-    # A generic cancel command that can be used outside conversations
-    application.add_handler(CommandHandler("cancel", cancel))
+    # GROUP 2: Các handler admin và lệnh thông thường
+    other_handlers = [
+        # Admin handlers (các nút đơn giản)
+        CallbackQueryHandler(handle_admin_promo_response, pattern='^admin_response:'),
+        CallbackQueryHandler(handle_admin_share_response, pattern='^admin_share_resp:'),
+        CallbackQueryHandler(handle_admin_kl006_response, pattern=r'^admin_kl006:'),
+        CallbackQueryHandler(handle_admin_deposit_response, pattern='^admin_deposit:'),
+        CallbackQueryHandler(handle_admin_withdraw_response, pattern='^admin_withdraw:'),
 
-    # --- General Callback Handlers (for menu navigation) ---
-    application.add_handler(CallbackQueryHandler(show_main_menu, pattern='^back_to_main_menu$'))
-    application.add_handler(CallbackQueryHandler(show_promo_menu, pattern='^show_promo_menu$'))
-    # A generic cancel button that can be used inside conversations (but is handled by fallbacks)
-    application.add_handler(CallbackQueryHandler(cancel, pattern='^cancel$'))
+        # Admin message handlers
+        MessageHandler(
+            filters.Chat(chat_id=config.ID_GROUP_KL007) & filters.REPLY & filters.TEXT & ~filters.COMMAND,
+            handle_admin_kl007_point_reply
+        ),
 
-    # --- Utility Handlers ---
-    # This handler gets the file ID of any photo sent to the bot
-    application.add_handler(MessageHandler(filters.PHOTO & ~filters.COMMAND, get_file_id_handler))
+        # Lệnh thông thường
+        CommandHandler("start", start),
+        CommandHandler("id", get_id_handler),
+        CommandHandler("shareadd", share_add_command),
 
+    ]
+    application.add_handlers(other_handlers, group=2)
 
-    # 4. Run the bot
+    # --- BƯỚC 4: CHẠY BOT ---
     logger.info("Bot is running. Polling for updates...")
     application.run_polling()
 

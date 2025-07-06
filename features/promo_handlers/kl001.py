@@ -9,11 +9,12 @@ from telegram.ext import (
     MessageHandler,
     filters,
 )
+from .common import PROMO_FALLBACKS
 from telegram.helpers import escape_markdown
 from telegram.constants import ParseMode
 
 from core import database
-from utils import keyboards
+from utils import keyboards, helpers
 from texts import PROMO_TEXT_KL001, RESPONSE_MESSAGES
 from features.common_handlers import cancel
 import config
@@ -31,18 +32,12 @@ async def start_kl001(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
     context.user_data['promo_code'] = 'KL001'
     keyboard = keyboards.create_agree_keyboard('KL001')
 
-    if query.message.caption:
-        await query.edit_message_caption(
-            caption=PROMO_TEXT_KL001,
-            reply_markup=keyboard,
-            parse_mode=ParseMode.MARKDOWN
-        )
-    else:
-        await query.edit_message_text(
-            text=PROMO_TEXT_KL001,
-            reply_markup=keyboard,
-            parse_mode=ParseMode.MARKDOWN
-        )
+    await helpers.edit_message_safely(
+        query=query,
+        new_text=PROMO_TEXT_KL001,
+        new_reply_markup=keyboard,
+        new_photo_file_id=config.PROMO_KL001_IMAGE_ID # <--- TRUYỀN ID ẢNH MỚI
+    )
 
     return AGREE_TERMS
 
@@ -83,7 +78,7 @@ async def receive_username(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     # Format the message for the admin group
     admin_text = (
         f"Yêu cầu {escape_markdown(promo_code, version=2)} \\- [{escape_markdown(user.first_name, version=2)}](tg://user?id={user.id})\n"
-        f"ID:  ```{escape_markdown(game_username, version=2)}```"
+        f"ID:  `{escape_markdown(game_username, version=2)}`"
     )
 
     admin_keyboard = keyboards.create_admin_promo_buttons(claim_id, user.id, promo_code)
@@ -113,9 +108,8 @@ kl001_conv_handler = ConversationHandler(
         AGREE_TERMS: [CallbackQueryHandler(ask_for_username, pattern='^agree_terms:KL001$')],
         RECEIVE_USERNAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_username)],
     },
-    fallbacks=[CallbackQueryHandler(cancel, pattern='^cancel$')],
-    map_to_parent={
-        # If the conversation ends, return to the main menu handler if needed
-        ConversationHandler.END: ConversationHandler.END
-    }
+    fallbacks=PROMO_FALLBACKS,  # <--- SỬ DỤNG FALLBACK CHUNG
+    block=False,                # <--- THÊM THAM SỐ NÀY
+    per_message=False,
+    name="kl001_conversation"
 )

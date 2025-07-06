@@ -1,172 +1,61 @@
-Tuyệt vời! Đây là một quy trình làm việc rất chuyên nghiệp và quan trọng. Việc đẩy (push) code từ PythonAnywhere lên một kho chứa Git (như GitHub, GitLab, Bitbucket) giúp bạn:
+# ========================
+# Credentials & Secrets
+# NEVER commit these files
+# ========================
+*.json
+*.env
+.env
+*.pem
 
-*   **Lưu trữ phiên bản:** Theo dõi mọi thay đổi trong code.
-*   **Sao lưu an toàn:** Code của bạn được lưu ở một nơi khác ngoài PythonAnywhere.
-*   **Hợp tác:** Dễ dàng làm việc chung với người khác.
-*   **Triển khai:** Có thể tự động hóa việc triển khai khi có code mới được đẩy lên.
+# But allow templates
+!credentials.template.json
+!example.env
 
-Dưới đây là hướng dẫn chi tiết từng bước để bạn thực hiện điều này ngay trên PythonAnywhere. Chúng ta sẽ lấy **GitHub** làm ví dụ phổ biến nhất.
 
----
+# ========================
+# Python
+# ========================
+# Virtual Environments
+venv/
+.venv/
+env/
+.env/
 
-### Điều kiện cần có
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
 
-1.  **Một tài khoản GitHub:** (Hoặc GitLab/Bitbucket).
-2.  **Một kho chứa (repository) mới trên GitHub:**
-    *   Vào GitHub, nhấn nút "New" để tạo một repository mới.
-    *   Đặt tên cho nó (ví dụ: `my-pythonanywhere-project`).
-    *   **Quan trọng:** Để dễ dàng cho lần push đầu tiên, **KHÔNG** tick vào các ô "Add a README file", "Add .gitignore", hoặc "Choose a license". Cứ để nó là một kho chứa trống hoàn toàn.
-    *   Sau khi tạo xong, GitHub sẽ cho bạn một trang với các URL (HTTPS và SSH). Hãy copy lại URL **HTTPS**. Nó sẽ trông giống như thế này: `https://github.com/your-username/my-pythonanywhere-project.git`.
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
 
----
+# ========================
+# IDE & OS specific
+# ========================
+.idea/
+.vscode/
 
-### Các bước thực hiện trên PythonAnywhere
+# macOS
+.DS_Store
 
-Tất cả các lệnh sau đây sẽ được thực hiện trong một **Bash Console** trên PythonAnywhere.
-
-#### Bước 1: Mở Bash Console
-
-Trên Dashboard của PythonAnywhere, tìm đến mục "Consoles" và nhấn vào nút **"Bash"**.
-
-#### Bước 2: Cấu hình Git lần đầu (Nếu bạn chưa từng làm)
-
-Git cần biết tên và email của bạn để ghi nhận ai là người thực hiện commit. Chạy hai lệnh sau, thay thế bằng thông tin của bạn:
-
-```bash
-git config --global user.name "Your Name"
-git config --global user.email "your.email@example.com"
-```
-
-#### Bước 3: Di chuyển vào thư mục dự án của bạn
-
-Sử dụng lệnh `cd` để đi vào thư mục chứa code bạn muốn đẩy lên.
-
-```bash
-# Ví dụ, nếu dự án của bạn tên là "myproject"
-cd /home/yourusername/myproject
-# (Nhớ thay "yourusername" và "myproject")
-```
-
-#### Bước 4: Khởi tạo Git và thêm file
-
-1.  **Khởi tạo kho chứa Git:** Lệnh này sẽ tạo một thư mục ẩn `.git` để theo dõi các thay đổi.
-
-    ```bash
-    git init
-    ```
-
-2.  **(Rất khuyến khích) Tạo file `.gitignore`:**
-    Bạn không muốn đẩy mọi thứ lên GitHub, đặc biệt là các file nhạy cảm, file tạm, hoặc môi trường ảo (`venv`). Hãy tạo một file `.gitignore`.
-
-    ```bash
-    # Mở trình soạn thảo nano để tạo file
-    nano .gitignore
-    ```
-
-    Dán nội dung sau vào (đây là một file `.gitignore` tốt cho dự án Python):
-
-    ```
-    # Virtual Environment
-    venv/
-    *.pyc
-    __pycache__/
-    
-    # Credentials
-    .env
-    credentials.json
-    
-    # PythonAnywhere specific
-    .pythonanywhere-version
-    
-    # IDE specific
-    .idea/
-    .vscode/
-    ```
-
-    Nhấn `Ctrl + X`, sau đó `Y`, và `Enter` để lưu lại.
-
-3.  **Thêm tất cả các file vào "khu vực chờ" (staging area):**
-    Dấu `.` có nghĩa là thêm tất cả các file và thư mục trong thư mục hiện tại (trừ những file trong `.gitignore`).
-
-    ```bash
-    git add .
-    ```
-
-#### Bước 5: Thực hiện Commit đầu tiên
-
-Commit giống như việc bạn tạo một "điểm lưu" cho dự án của mình với một lời nhắn.
-
-```bash
-git commit -m "Initial commit: My project from PythonAnywhere"
-```
-
-#### Bước 6: Kết nối với kho chứa trên GitHub
-
-Bây giờ, chúng ta sẽ bảo cho Git ở PythonAnywhere biết "địa chỉ nhà" của kho chứa trên GitHub.
-
-Sử dụng URL HTTPS bạn đã copy ở đầu.
-
-```bash
-# Đổi "main" thành "master" nếu bạn dùng tên nhánh cũ
-git branch -M main
-
-# Thêm remote tên là "origin"
-git remote add origin https://github.com/your-username/my-pythonanywhere-project.git
-```
-
-#### Bước 7: Đẩy (Push) Code của bạn
-
-Đây là bước cuối cùng, gửi tất cả các commit của bạn lên GitHub.
-
-```bash
-git push -u origin main
-```
-
-**Quan trọng: Vấn đề xác thực**
-
-Khi bạn chạy lệnh `push`, GitHub cần xác thực bạn là ai. Vì bạn đang dùng URL HTTPS, nó sẽ hỏi **Username** và **Password**.
-
-*   **Username:** Nhập username GitHub của bạn.
-*   **Password:** **KHÔNG** sử dụng mật khẩu GitHub thông thường của bạn. Từ năm 2021, GitHub yêu cầu bạn phải dùng **Personal Access Token (PAT)**.
-
-**Cách tạo Personal Access Token (PAT):**
-
-1.  Vào GitHub, nhấn vào avatar của bạn ở góc trên bên phải -> **Settings**.
-2.  Ở menu bên trái, kéo xuống dưới cùng và chọn **Developer settings**.
-3.  Chọn **Personal access tokens** -> **Tokens (classic)**.
-4.  Nhấn **"Generate new token"** (chọn "Generate new token (classic)").
-5.  **Note:** Đặt tên cho token, ví dụ "PythonAnywhere Push".
-6.  **Expiration:** Chọn thời gian hết hạn (ví dụ 30 ngày, 90 ngày).
-7.  **Select scopes:** Tick vào ô **`repo`**. Điều này sẽ cấp cho token toàn quyền trên các kho chứa của bạn.
-8.  Nhấn **"Generate token"**.
-9.  **SAO CHÉP TOKEN NGAY LẬP TỨC.** Đây là lần duy nhất GitHub hiển thị nó. Hãy lưu nó vào một nơi an toàn.
-
-Bây giờ, quay lại Bash console trên PythonAnywhere, khi được hỏi password, hãy **dán Personal Access Token** vào đó và nhấn Enter.
-
-Sau khi thành công, bạn có thể tải lại trang GitHub repo của mình và sẽ thấy tất cả code đã xuất hiện!
-
----
-
-### Quy trình làm việc cho những lần sau
-
-Sau lần đầu tiên, quy trình làm việc của bạn sẽ đơn giản hơn rất nhiều:
-
-1.  Thay đổi code của bạn trên PythonAnywhere.
-2.  Mở Bash console và vào thư mục dự án.
-3.  Chạy các lệnh sau:
-
-    ```bash
-    # Xem những file đã thay đổi
-    git status
-    
-    # Thêm các thay đổi
-    git add .
-    
-    # Commit với một lời nhắn mới
-    git commit -m "Add new feature or fix bug"
-    
-    # Đẩy lên GitHub (bây giờ chỉ cần lệnh này)
-    git push
-    ```
-
-Chúc bạn thành công
+# Windows
+Thumbs.db

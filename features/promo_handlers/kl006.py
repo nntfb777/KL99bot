@@ -9,11 +9,12 @@ from telegram.ext import (
     MessageHandler,
     filters,
 )
+from .common import PROMO_FALLBACKS
 from telegram.helpers import escape_markdown
 from telegram.constants import ParseMode
 
 from core import database
-from utils import keyboards
+from utils import keyboards, helpers, gspread_api
 from texts import PROMO_TEXT_KL006, RESPONSE_MESSAGES
 from features.common_handlers import cancel
 import config
@@ -32,18 +33,12 @@ async def start_kl006(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
     keyboard = keyboards.create_agree_keyboard('KL006')
 
 
-    if query.message.caption:
-        await query.edit_message_caption(
-            caption=PROMO_TEXT_KL006,
-            reply_markup=keyboard,
-            parse_mode=ParseMode.MARKDOWN_V2
-        )
-    else:
-        await query.edit_message_text(
-            text=PROMO_TEXT_KL006,
-            reply_markup=keyboard,
-            parse_mode=ParseMode.MARKDOWN_V2
-        )
+    await helpers.edit_message_safely(
+        query=query,
+        new_text=PROMO_TEXT_KL006,
+        new_reply_markup=keyboard,
+        new_photo_file_id=config.PROMO_KL006_IMAGE_ID
+    )
     return AGREE_TERMS
 
 async def ask_group_size(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -96,16 +91,34 @@ async def receive_usernames(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     promo_code = context.user_data.get('promo_code', 'KL006')
     group_size = context.user_data.get('kl006_group_size')
 
-    usernames = [u.strip() for u in re.split(r'[,\n\s]+', update.message.text) if u.strip()]
+    usernames = re.split(r'[,\s]+', update.message.text.strip())
+    # Loại bỏ các chuỗi rỗng có thể có
+    usernames = [name for name in usernames if name]
 
     if len(usernames) != group_size:
-        await update.message.reply_text(
-            RESPONSE_MESSAGES["kl006_invalid_username_count"].format(
-                submitted_count=len(usernames),
-                expected_count=group_size
-            )
+        message = RESPONSE_MESSAGES["kl006_invalid_username_count"].format(
+            submitted_count=len(usernames),
+            expected_count=group_size
         )
-        return RECEIVE_USERNAMES # Stay in the same state to re-enter
+        await update.message.reply_text(message)
+        return AWAIT_USERNAMES # Yêu cầu nhập lại
+
+    # === LOGIC KIỂM TRA MỚI ===
+    # Gọi API để kiểm tra nhóm
+    is_valid_group, error_message = gspread_api.find_kl006_group(usernames)
+
+    if not is_valid_group:
+        # Nếu nhóm không hợp lệ, thông báo lỗi cho người dùng và kết thúc
+        # Tùy chỉnh thông báo lỗi dựa trên kết quả trả về
+        if "chưa được đăng ký" in error_message:
+            # Format lại để chèn tên user vào
+            username_not_found = error_message.split("'")[1]
+            final_error_message = RESPONSE_MESSAGES["kl006_user_not_registered"].format(username=username_not_found)
+        else:
+            final_error_message = RESPONSE_MESSAGES["kl006_users_not_in_same_group"]
+
+        await update.message.reply_text(final_error_message, reply_markup=keyboards.create_back_to_main_menu_markup())
+        return ConversationHandler.END
 
     # Add claim to DB
     claim_id = database.add_promo_claim(
@@ -149,5 +162,8 @@ kl006_conv_handler = ConversationHandler(
         CHOOSE_GROUP_SIZE: [CallbackQueryHandler(ask_for_usernames, pattern=r'^kl006_select_group:\d+$')],
         RECEIVE_USERNAMES: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_usernames)],
     },
-    fallbacks=[CallbackQueryHandler(cancel, pattern='^cancel$')],
+    fallbacks=PROMO_FALLBACKS,  # <--- SỬ DỤNG FALLBACK CHUNG
+    block=False,                # <--- THÊM THAM SỐ NÀY
+    per_message=False,
+    name="kl006_conversation"
 )

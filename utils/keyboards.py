@@ -1,5 +1,5 @@
 # utils/keyboards.py
-
+import random
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from texts import RESPONSE_MESSAGES
 import config
@@ -11,9 +11,10 @@ def create_main_menu_markup() -> InlineKeyboardMarkup:
     keyboard = [
         [InlineKeyboardButton(RESPONSE_MESSAGES["khuyen_mai_button_text"], callback_data='show_promo_menu')],
         [InlineKeyboardButton(RESPONSE_MESSAGES["share_code_button_text"], callback_data='share_code_entry_point')],
+        [InlineKeyboardButton(RESPONSE_MESSAGES["transaction_menu_button"], callback_data='transaction_entry_point')],
         [
             InlineKeyboardButton(RESPONSE_MESSAGES["download_app_button_text"], url=config.APP_DOWNLOAD_LINK),
-            InlineKeyboardButton(RESPONSE_MESSAGES["homepage_button_text"], url=config.GAME_LINK)
+            InlineKeyboardButton(RESPONSE_MESSAGES["homepage_button_text"], url=random.choice(config.GAME_LINKS))
         ],
         [
             InlineKeyboardButton(RESPONSE_MESSAGES["facebook_button_text"], url=config.FACEBOOK_LINK),
@@ -77,13 +78,30 @@ def create_app_promo_image_confirm_keyboard() -> InlineKeyboardMarkup:
 
 # --- Sharing Feature Keyboards ---
 
-def create_sharing_menu_markup() -> InlineKeyboardMarkup:
-    """Creates the main menu for the sharing feature."""
-    keyboard = [
-        [InlineKeyboardButton(RESPONSE_MESSAGES["request_code_reward_button"], callback_data='share_request_reward')],
-        [InlineKeyboardButton(RESPONSE_MESSAGES["get_my_share_link_button"], callback_data='share_get_link')],
-        [InlineKeyboardButton(RESPONSE_MESSAGES["back_to_menu_button"], callback_data='back_to_main_menu')]
-    ]
+def create_sharing_menu_markup(show_claim_button: bool = True) -> InlineKeyboardMarkup:
+    """
+    Tạo bàn phím cho menu chia sẻ.
+
+    Args:
+        show_claim_button (bool): True nếu muốn hiển thị nút "Nhận thưởng".
+                                  Mặc định là True.
+    """
+    keyboard = []
+
+    # Chỉ thêm nút "Nhận thưởng" nếu điều kiện cho phép
+    if show_claim_button:
+        keyboard.append([
+            InlineKeyboardButton(RESPONSE_MESSAGES["request_code_reward_button"], callback_data='share_request_reward')
+        ])
+
+    # Các nút còn lại luôn được thêm vào
+    keyboard.append([
+        InlineKeyboardButton(RESPONSE_MESSAGES["get_my_share_link_button"], callback_data='share_get_link')
+    ])
+    keyboard.append([
+        InlineKeyboardButton(RESPONSE_MESSAGES["back_to_menu_button"], callback_data='back_to_main_menu')
+    ])
+
     return InlineKeyboardMarkup(keyboard)
 
 
@@ -100,9 +118,9 @@ def create_admin_promo_buttons(claim_id: int, user_id: int, promo_code: str,user
                 InlineKeyboardButton("✅ Thành Công", callback_data=f"admin_response:{claim_id}:{user_id}:{promo_code}:thanh_cong")
             ],
             [
-                InlineKeyboardButton("🔗 Chưa LK NH", callback_data=f"admin_response:{claim_id}:{user_id}:{promo_code}:chua_lien_ket_ngan_hang"),
-                InlineKeyboardButton("📞 Sai TT (CSKH)", callback_data=f"admin_response:{claim_id}:{user_id}:{promo_code}:sai_thong_tin_lien_he_cskh")
-            ]
+                InlineKeyboardButton("🔗 Chưa LK NH", callback_data=f"admin_response:{claim_id}:{user_id}:{promo_code}:CLKNH"),
+                InlineKeyboardButton("📞 Sai TT (CSKH)", callback_data=f"admin_response:{claim_id}:{user_id}:{promo_code}:SaiTT")
+            ],
             [
                 InlineKeyboardButton("🚫 Đã nhận KM001", callback_data=f"admin_response:{claim_id}:{user_id}:{promo_code}:kl001_da_nhan"),
                 InlineKeyboardButton("🌐 Trùng IP", callback_data=f"admin_response:{claim_id}:{user_id}:{promo_code}:trung_ip")
@@ -119,15 +137,15 @@ def create_admin_promo_buttons(claim_id: int, user_id: int, promo_code: str,user
                 InlineKeyboardButton("✅ Thành Công", callback_data=f"admin_response:{claim_id}:{user_id}:{promo_code}:thanh_cong")
             ],
             [
-                InlineKeyboardButton("🔗 Chưa LK NH", callback_data=f"admin_response:{claim_id}:{user_id}:{promo_code}:chua_lien_ket_ngan_hang"),
-                InlineKeyboardButton("📞 Sai TT (CSKH)", callback_data=f"admin_response:{claim_id}:{user_id}:{promo_code}:sai_thong_tin_lien_he_cskh")
-            ]
-            [
-                InlineKeyboardButton("🚫 Đã nhận KM App", callback_data=f"admin_response:{claim_id}:{user_id}:{promo_code}:app_promo_da_nhan"),
-                InlineKeyboardButton("🖼️ Y/c hình ảnh", callback_data=f"admin_response:{claim_id}:{user_id}:{promo_code}:app_promo_yeu_cau_hinh_anh")
+                InlineKeyboardButton("🔗 Chưa LK NH", callback_data=f"admin_response:{claim_id}:{user_id}:{promo_code}:CLKNH"),
+                InlineKeyboardButton("📞 Sai TT (CSKH)", callback_data=f"admin_response:{claim_id}:{user_id}:{promo_code}:SaiTT")
             ],
             [
-                InlineKeyboardButton("🌐 Trùng IP (App)", callback_data=f"admin_response:{claim_id}:{user_id}:{promo_code}:app_promo_trung_ip")
+                InlineKeyboardButton("🚫 Đã nhận KM App", callback_data=f"admin_response:{claim_id}:{user_id}:{promo_code}:app_promo_dn"),
+                InlineKeyboardButton("🖼️ Y/c hình ảnh", callback_data=f"admin_response:{claim_id}:{user_id}:{promo_code}:app_promo_ha")
+            ],
+            [
+                InlineKeyboardButton("🌐 Trùng IP (App)", callback_data=f"admin_response:{claim_id}:{user_id}:{promo_code}:app_promo_ip")
             ]
         ])
     elif promo_code == 'KL006':
@@ -180,8 +198,7 @@ def create_admin_promo_buttons(claim_id: int, user_id: int, promo_code: str,user
         buttons.extend([
             [InlineKeyboardButton("❌ Sai ID", callback_data=f"admin_response:{claim_id}:{user_id}:KL007:sai_id")],
             [InlineKeyboardButton("🎫 Không có vé cược", callback_data=f"admin_response:{claim_id}:{user_id}:KL007:khong_co_ve_kl007")],
-            [InlineKeyboardButton("🚫 Đã nhận KM007 hôm nay", callback_data=f"admin_response:{claim_id}:{user_id}:KL007:kl007_da_nhan")],
-            [InlineKeyboardButton("💬 Cộng điểm (Reply số điểm)", callback_data=f"admin_kl007_prompt_reply:{claim_id}:{user_id}")]
+            [InlineKeyboardButton("🚫 Đã nhận KM007 hôm nay", callback_data=f"admin_response:{claim_id}:{user_id}:KL007:kl007_da_nhan")]
         ])
     return InlineKeyboardMarkup(buttons)
 
@@ -197,8 +214,69 @@ def create_admin_share_reward_buttons(claim_id: int, user_id: int, milestone: in
     ]
     return InlineKeyboardMarkup(keyboard)
 
-def create_customer_response_keyboard(promo_code: str) -> InlineKeyboardMarkup:
+def create_customer_response_keyboard(promo_code: str = None) -> InlineKeyboardMarkup:
     """Creates a simple keyboard for user to return to main menu after receiving admin response."""
     keyboard = [[InlineKeyboardButton(RESPONSE_MESSAGES["back_to_menu_button"], callback_data='back_to_main_menu')]]
     return InlineKeyboardMarkup(keyboard)
 
+def create_transaction_menu_markup() -> InlineKeyboardMarkup:
+    """Tạo bàn phím cho menu chọn Nạp hoặc Rút."""
+    keyboard = [
+        [
+            InlineKeyboardButton(RESPONSE_MESSAGES["transaction_deposit_button"], callback_data='transaction_deposit'),
+            InlineKeyboardButton(RESPONSE_MESSAGES["transaction_withdraw_button"], callback_data='transaction_withdraw')
+        ],
+        [InlineKeyboardButton(RESPONSE_MESSAGES["back_to_menu_button"], callback_data='back_to_main_menu')]
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+
+def create_admin_deposit_keyboard(user_id: int) -> InlineKeyboardMarkup:
+    """Tạo bàn phím xử lý cho yêu cầu hỗ trợ nạp tiền của admin."""
+    # Chúng ta không cần claim_id vì yêu cầu nạp tiền không được lưu trữ lâu dài
+    # Ta sẽ dùng user_id để định danh.
+
+    # Định nghĩa callback_data với một prefix riêng: `admin_deposit:`
+    # Format: admin_deposit:<user_id>:<action>
+
+    keyboard = [
+        [
+            InlineKeyboardButton("✅ Thành công", callback_data=f"admin_deposit:{user_id}:thanh_cong"),
+            InlineKeyboardButton("❌ Sai ID", callback_data=f"admin_deposit:{user_id}:sai_id")
+        ],
+        [
+            InlineKeyboardButton("💸 Lên trang khác", callback_data=f"admin_deposit:{user_id}:da_len_trang_khac"),
+            InlineKeyboardButton("🚫 Không phải CT", callback_data=f"admin_deposit:{user_id}:khong_phai_cua_chung_toi")
+        ],
+        [
+            InlineKeyboardButton("🧾 HĐ không đúng", callback_data=f"admin_deposit:{user_id}:hoa_don_khong_dung"),
+            InlineKeyboardButton("⏳ Chưa nhận tiền", callback_data=f"admin_deposit:{user_id}:chua_nhan_duoc_tien")
+        ],
+        [
+            InlineKeyboardButton("🔄 Làm lại lệnh", callback_data=f"admin_deposit:{user_id}:lam_lai_lenh"),
+            InlineKeyboardButton("📈 Đã lên điểm", callback_data=f"admin_deposit:{user_id}:da_len_diem")
+        ]
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+
+def create_admin_withdraw_keyboard(user_id: int) -> InlineKeyboardMarkup:
+    """Tạo bàn phím xử lý cho yêu cầu hỗ trợ rút tiền của admin."""
+    # Sử dụng prefix 'admin_withdraw:' để phân biệt
+    # Format: admin_withdraw:<user_id>:<action>
+
+    keyboard = [
+        [
+            InlineKeyboardButton("✅ Thành công", callback_data=f"admin_withdraw:{user_id}:thanh_cong"),
+            InlineKeyboardButton("🧾 Gửi HĐ", callback_data=f"admin_withdraw:{user_id}:gui_hd")
+        ],
+        [
+            InlineKeyboardButton("❌ Sai TT", callback_data=f"admin_withdraw:{user_id}:sai_tt"),
+            InlineKeyboardButton("📈 Y/c sao kê", callback_data=f"admin_withdraw:{user_id}:yeu_cau_sao_ke")
+        ],
+        [
+            InlineKeyboardButton("🛠️ Bảo trì", callback_data=f"admin_withdraw:{user_id}:bao_tri"),
+            InlineKeyboardButton("📞 CSKH", callback_data=f"admin_withdraw:{user_id}:cskh")
+        ]
+    ]
+    return InlineKeyboardMarkup(keyboard)

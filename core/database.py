@@ -1,13 +1,19 @@
 # core/database.py
-
+import secrets
 import sqlite3
 import logging
 import json
 import uuid
+import aiosqlite
+from config import DB_PATH
 
 # Cấu hình logging
 logger = logging.getLogger(__name__)
 DB_FILE = 'klbot.db'
+
+
+async def get_connection():
+    return await aiosqlite.connect(DB_PATH)
 
 def get_db_connection():
     """
@@ -78,9 +84,10 @@ def init_db():
 
 # =========== HÀM THAO TÁC VỚI USERS ===========
 
-def get_or_create_user(user_id: int, first_name: str, username: str = None):
+def get_or_create_user(user_id: int, first_name: str = None, username: str = None):
     """
     Lấy thông tin người dùng. Nếu chưa tồn tại, tạo mới và trả về.
+    first_name và username là tùy chọn, hữu ích khi chỉ muốn lấy thông tin.
     """
     conn = get_db_connection()
     try:
@@ -89,26 +96,38 @@ def get_or_create_user(user_id: int, first_name: str, username: str = None):
         user = cursor.fetchone()
 
         if user:
+            # Nếu người dùng đã tồn tại, chỉ cần trả về thông tin của họ
             return dict(user)
         else:
-            # Tạo mã giới thiệu duy nhất
+            # === LOGIC TẠO NGƯỜI DÙNG MỚI ===
+
+            # 1. Đặt giá trị mặc định cho first_name NẾU nó không được cung cấp
+            if not first_name:
+                first_name = f"User {user_id}"
+
+            # 2. Tạo mã giới thiệu duy nhất
             ref_code = str(uuid.uuid4())[:8]
+            # Vòng lặp while để đảm bảo mã là duy nhất (logic này đã tốt)
             cursor.execute("SELECT 1 FROM users WHERE referral_code = ?", (ref_code,))
             while cursor.fetchone():
                 ref_code = str(uuid.uuid4())[:8]
                 cursor.execute("SELECT 1 FROM users WHERE referral_code = ?", (ref_code,))
 
-            # Thêm người dùng mới
+            # 3. Thêm người dùng mới vào database
             cursor.execute(
                 "INSERT INTO users (user_id, first_name, username, referral_code, claimed_milestones) VALUES (?, ?, ?, ?, ?)",
                 (user_id, first_name, username, ref_code, json.dumps([]))
             )
             conn.commit()
             logger.info(f"Người dùng mới đã được tạo: ID {user_id}, Tên {first_name}")
+
+            # 4. Lấy lại thông tin người dùng vừa tạo và trả về
             cursor.execute("SELECT * FROM users WHERE user_id = ?", (user_id,))
             return dict(cursor.fetchone())
+
     finally:
-        conn.close()
+        if conn:
+            conn.close()
 
 def set_referrer(user_id: int, referrer_id: int) -> bool:
     """Gán người giới thiệu cho user và tăng điểm cho người giới thiệu."""
@@ -251,3 +270,119 @@ def delete_share_claim(claim_id: int):
         logger.info(f"Yêu cầu mốc chia sẻ ID {claim_id} đã bị từ chối và xóa.")
     finally:
         conn.close()
+
+
+async def add_shares_to_user(user_id: int, shares_delta: int) -> tuple[bool, int]:
+    """
+    Cộng hoặc trừ lượt chia sẻ cho người dùng.
+    Nếu người dùng chưa có, sẽ tự động tạo mới trước khi thay đổi.
+    """
+    if shares_delta == 0:
+        return False, -1
+
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+
+        # 1. Đảm bảo người dùng tồn tại bằng cách gọi get_or_create_user
+        # LƯU Ý: Chúng ta cần thông tin first_name. Lệnh admin không có thông tin này.
+        # Chúng ta sẽ tạm thời dùng một tên mặc định nếu phải tạo mới.
+
+        # Kiểm tra trước
+        cursor.execute("SELECT * FROM users WHERE user_id = ?", (user_id,))
+        user_record = cursor.fetchone()
+
+        if not user_record:
+            # Nếu không có, tạo mới với tên mặc định. Admin có thể sửa sau nếu cần.
+            # Bạn cần lấy first_name và username từ đâu đó hoặc dùng giá trị mặc định.
+            # Vì lệnh này admin dùng, bot không biết tên người dùng.
+            # Chúng ta sẽ tạo một người dùng "tạm"
+            logger.warning(f"User {user_id} not found. Creating a temporary user record to add shares.")
+            # Tạo mã giới thiệu duy nhất
+            ref_code = str(uuid.uuid4())[:8]
+            cursor.execute("SELECT 1 FROM users WHERE referral_code = ?", (ref_code,))
+            while cursor.fetchone():
+                ref_code = str(uuid.uuid4())[:8]
+
+            cursor.execute(
+                "INSERT INTO users (user_id, first_name, username, referral_code, claimed_milestones) VALUES (?, ?, ?, ?, ?)",
+                (user_id, f"User {user_id}", None, ref_code, json.dumps([]))
+            )
+            # Lấy lại bản ghi vừa tạo
+            cursor.execute("SELECT * FROM users WHERE user_id = ?", (user_id,))
+            user_record = cursor.fetchone()
+
+        current_shares = user_record['share_count']
+
+        # 2. Tính toán giá trị mới
+        new_total = max(0, current_shares + shares_delta)
+
+        # 3. Cập nhật
+        cursor.execute(
+            "UPDATE users SET share_count = ? WHERE user_id = ?",
+            (new_total, user_id)
+        )
+        conn.commit()
+
+        logger.info(f"Admin changed shares for user {user_id} by {shares_delta}. Old: {current_shares}, New: {new_total}")
+        return True, new_total
+
+    except Exception as e:
+        logger.error(f"Failed to update share_count for user {user_id} in database: {e}")
+        return False, -1
+    finally:
+        if conn:
+            conn.close()
+
+def get_user_by_referral_code(ref_code: str):
+    """
+    Tìm người dùng dựa trên mã giới thiệu (referral_code).
+
+    Args:
+        ref_code (str): Mã giới thiệu cần tìm.
+
+    Returns:
+        dict: Một dictionary chứa thông tin người dùng nếu tìm thấy,
+              nếu không thì trả về None.
+    """
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM users WHERE referral_code = ?", (ref_code,))
+        user = cursor.fetchone()
+
+        return dict(user) if user else None
+
+    except Exception as e:
+        logger.error(f"Lỗi khi tìm người dùng bằng mã giới thiệu '{ref_code}': {e}")
+        return None
+    finally:
+        if conn:
+            conn.close()
+
+
+def get_user_by_id(user_id: int):
+    """
+    Tìm người dùng dựa trên user_id.
+
+    Args:
+        user_id (int): ID của người dùng Telegram cần tìm.
+
+    Returns:
+        dict: Một dictionary chứa thông tin người dùng nếu tìm thấy,
+              nếu không thì trả về None.
+    """
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM users WHERE user_id = ?", (user_id,))
+        user = cursor.fetchone()
+
+        return dict(user) if user else None
+
+    except Exception as e:
+        logger.error(f"Lỗi khi tìm người dùng bằng ID '{user_id}': {e}")
+        return None
+    finally:
+        if conn:
+            conn.close()
