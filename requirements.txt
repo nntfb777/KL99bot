@@ -4,3 +4,5 @@ aiosqlite
 gspread
 oauth2client
 cachetools
+requests
+httpx==0.27.0

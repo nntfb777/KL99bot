@@ -9,14 +9,12 @@ from telegram.ext import (
     MessageHandler,
     filters,
 )
-from .common import PROMO_FALLBACKS
+from ..fallbacks import get_fallbacks
 from telegram.helpers import escape_markdown
 from telegram.constants import ParseMode
-
 from core import database
 from utils import keyboards, helpers
 from texts import PROMO_TEXT_APP_EXPERIENCE, RESPONSE_MESSAGES
-from features.common_handlers import cancel
 import config
 
 logger = logging.getLogger(__name__)
@@ -29,21 +27,16 @@ async def start_app_promo(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     query = update.callback_query
     await query.answer()
 
+    helpers.add_message_to_cleanup_list(context, query.message)
     context.user_data['promo_code'] = 'APP_PROMO'
     keyboard = keyboards.create_agree_keyboard('APP_PROMO')
 
-    try:
-        await query.edit_message_caption(
-            caption=PROMO_TEXT_APP_EXPERIENCE,
-            reply_markup=keyboard,
-            parse_mode=ParseMode.MARKDOWN
-        )
-    except Exception:
-        await query.edit_message_text(
-            text=PROMO_TEXT_APP_EXPERIENCE,
-            reply_markup=keyboard,
-            parse_mode=ParseMode.MARKDOWN
-        )
+    await helpers.edit_message_safely(
+        query=query,
+        new_text=PROMO_TEXT_APP_EXPERIENCE,
+        new_reply_markup=keyboard,
+        new_photo_file_id=config.PROMO_KL001_IMAGE_ID # <--- TRUYỀN ID ẢNH MỚI
+    )
     return AGREE_TERMS
 
 async def ask_for_username(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -51,7 +44,6 @@ async def ask_for_username(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     query = update.callback_query
     await query.answer()
 
-    await helpers.remove_buttons(update)
     await context.bot.send_message(
         chat_id=query.message.chat_id,
         text=RESPONSE_MESSAGES["ask_username_app_promo"],
@@ -63,10 +55,11 @@ async def ask_for_image_confirm(update: Update, context: ContextTypes.DEFAULT_TY
     """Saves username and asks if they have a confirmation image."""
     context.user_data['game_username'] = update.message.text.strip()
 
-    await update.message.reply_text(
+    edited_message = await update.message.reply_text(
         text=RESPONSE_MESSAGES["app_promo_ask_image"],
         reply_markup=keyboards.create_app_promo_image_confirm_keyboard()
     )
+    helpers.add_message_to_cleanup_list(context, edited_message)
     return AWAIT_IMAGE_CONFIRM
 
 async def handle_image_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -89,7 +82,10 @@ async def handle_image_confirm(update: Update, context: ContextTypes.DEFAULT_TYP
 async def receive_image(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Receives the photo and sends the request to admin."""
     if not update.message.photo:
-        await update.message.reply_text("Vui lòng gửi một hình ảnh.")
+        edited_message = await update.message.reply_text(
+        text=RESPONSE_MESSAGES["app_promo_request_image_again"],
+        reply_markup=keyboards.create_cancel_keyboard()
+    )
         return RECEIVE_IMAGE
 
     context.user_data['photo_id'] = update.message.photo[-1].file_id
@@ -152,7 +148,7 @@ async def send_request_to_admin(update: Update, context: ContextTypes.DEFAULT_TY
             reply_markup=keyboards.create_back_to_main_menu_markup()
         )
 
-    context.user_data.clear()
+    #context.user_data.clear()
     return ConversationHandler.END
 
 app_promo_conv_handler = ConversationHandler(
@@ -163,8 +159,8 @@ app_promo_conv_handler = ConversationHandler(
         AWAIT_IMAGE_CONFIRM: [CallbackQueryHandler(handle_image_confirm, pattern=r'^app_promo_has_image:(yes|no)$')],
         RECEIVE_IMAGE: [MessageHandler(filters.PHOTO, receive_image)],
     },
-    fallbacks=PROMO_FALLBACKS,  # <--- SỬ DỤNG FALLBACK CHUNG
-    block=False,                # <--- THÊM THAM SỐ NÀY
+    fallbacks=get_fallbacks(),
+    block=False,
     per_message=False,
     name="app_conversation"
 )

@@ -47,24 +47,41 @@ DB_PATH = os.path.join(BASE_DIR, DB_NAME)
 # Tên người dùng của bot (sẽ được cập nhật tự động khi bot khởi tạo từ Telegram API)
 BOT_USERNAME = None
 
-# Tên hiển thị bạn muốn đặt cho bot
 BOT_DISPLAY_NAME = "KL99 - Đẳng Cấp Hàng Đầu Châu Á!"
 
-# Các mốc chia sẻ và số tiền thưởng
-SHARE_MILESTONES = [15, 30, 50, 100]
+SHARE_MILESTONES_REWARDS = {
+    15: 8,
+    30: 18,
+    50: 28,
+    100: 38,
+    200: 58,
+    500: 88,
+    1000:138
+}
 
-# Bạn có thể lấy File ID bằng cách gửi ảnh cho bot và dùng lệnh /getid (nếu bạn đã implement)
-# hoặc dùng hàm get_file_id_handler trong handlers/utils.py
-START_IMAGE_FILE_ID = "AgACAgUAAxkBAAIHMWho1E3K6PhGU6MW8CksYWduIVFdAAISxDEbVz9IV0CguZpfUdkQAQADAgADeAADNgQ"
-PROMO_KL001_IMAGE_ID = "AgACAgUAAxkBAAICg2g-Mt3D4jR3CW2HjTB9pvt-B2GjAAK2wTEbhgHwVaax8wABZYXQngEAAwIAA3MAAzYE"
-PROMO_KL006_IMAGE_ID = "AgACAgUAAxkBAAIHK2ho08XJrnhpQx5RYGkQv65mzuZ1AAILxDEbVz9IV79-jYJtNslTAQADAgADeAADNgQ"
-PROMO_KL007_IMAGE_ID = "AgACAgUAAxkBAAIHLmho0-HoawSU9gTF6XOA0nonQYuXAAINxDEbVz9IV5DQ2gmCV3OVAQADAgADeAADNgQ"
+SHARE_MILESTONES = list(SHARE_MILESTONES_REWARDS.keys())
+
+
+START_IMAGE_FILE_ID = "AgACAgUAAxkBAAOlaHCwMAOf5hdNF-nW3Ldk4-49hZ8AAm_PMRvQLIlXjDylPEEdof4BAAMCAAN4AAM2BA"
+PROMO_KL001_IMAGE_ID = "AgACAgUAAxkBAAOraHCwlrKeuXkGu4n60zjmA31pBR8AAnDPMRvQLIlXvyZZxbm_Ti0BAAMCAAN4AAM2BA"
+PROMO_KL006_IMAGE_ID = "AgACAgUAAxkBAAOuaHCwyIWTjNfPFf6xkgtKmrRtYmIAAnHPMRvQLIlXttqdWGwGakMBAAMCAAN4AAM2BA"
+PROMO_KL007_IMAGE_ID = "AgACAgUAAxkBAAOxaHCxmVnniBDAT0UYQZ0GfYvMvZkAAnXPMRvQLIlXPLJ5NNG7iDwBAAMCAAN4AAM2BA"
+PROMO_IMAGE_ID = "AgACAgUAAxkBAAO0aHCxr1PudDghuCLKEgVGtO_8tQUAAnbPMRvQLIlXSJN9Mz7Jt9oBAAMCAAN4AAM2BA"
+TRANS_IMAGE_ID = "AgACAgUAAxkBAAO3aHC0RiRhUhSI1o-kZNPsm5qQz5MAAnjPMRvQLIlX0Tc55ynPV2sBAAMCAAN4AAM2BA"
+SHARING_IMAGE_ID = "AgACAgUAAxkBAAO6aHC0YWh62zyI-VxPVHFT6j1txfIAAnnPMRvQLIlXOdg7-3V4uPIBAAMCAAN5AAM2BA"
 
 try:
     ID_GROUP_PROMO = int(os.getenv("ID_GROUP_PROMO"))
 except (ValueError, TypeError):
     logger.error("Lỗi: ID_GROUP_PROMO không được đặt hoặc không phải là số trong file .env. Đặt giá trị mặc định là 0.")
     ID_GROUP_PROMO = 0 # Đặt một giá trị mặc định an toàn để bot không crash
+
+try:
+    ID_GROUP_LINK = int(os.getenv("ID_GROUP_LINK"))
+except (ValueError, TypeError):
+    logger.error("Lỗi: ID_GROUP_PROMO không được đặt hoặc không phải là số trong file .env. Đặt giá trị mặc định là 0.")
+    ID_GROUP_ADMIN = 0
+
 
 try:
     # Đọc ID của nhóm log lỗi từ biến môi trường
@@ -87,3 +104,14 @@ try:
 except (ValueError, TypeError):
     logger.warning("Cảnh báo: ID_GROUP_KL007 không được đặt trong file .env. Chức năng duyệt điểm KL007 có thể không hoạt động.")
     ID_GROUP_KL007 = 0 # Đặt giá trị mặc định an toàn
+
+try:
+    GA4_MEASUREMENT_ID =os.getenv("GA4_MEASUREMENT_ID")
+except (ValueError, TypeError):
+    logger.warning("GA4_MEASUREMENT_ID không được đặt trong .env.")
+
+
+try:
+    GA4_API_SECRET = os.getenv("GA4_API_SECRET")
+except (ValueError, TypeError):
+    logger.warning("GA4_API_SECRET không được đặt trong .env.")
